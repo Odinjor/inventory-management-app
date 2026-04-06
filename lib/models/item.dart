@@ -18,10 +18,10 @@ class Item {
   /// Convert Item to JSON for Firestore
   Map<String, dynamic> toJson() {
     return {
-      'itemNumber': itemNumber,
-      'itemName': itemName,
-      'itemStock': itemStock,
-      'itemType': itemType,
+      'IItem#': itemNumber,
+      'ItemName': itemName,
+      'ItemStock': itemStock,
+      'ItemType': itemType,
     };
   }
 
@@ -29,10 +29,10 @@ class Item {
   factory Item.fromJson(Map<String, dynamic> json, String documentId) {
     return Item(
       id: documentId,
-      itemNumber: (json['itemNumber'] ?? 0).toDouble(),
-      itemName: json['itemName'] ?? '',
-      itemStock: (json['itemStock'] ?? 0).toDouble(),
-      itemType: json['itemType'] ?? '',
+      itemNumber: (json['Item#'] ?? 0).toDouble(),
+      itemName: json['ItemName'] ?? '',
+      itemStock: (json['ItemStock'] ?? 0).toDouble(),
+      itemType: json['ItemType'] ?? '',
     );
   }
 

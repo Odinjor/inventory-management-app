@@ -11,7 +11,7 @@ class FirebaseService {
   FirebaseService._internal();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _collectionName = 'items';
+  final String _collectionName = 'Items';
 
   /// Stream that returns a list of typed Items
   Stream<List<Item>> getItemsStream() {
@@ -43,7 +43,7 @@ class FirebaseService {
   Stream<List<Item>> getItemsByTypeStream(String itemType) {
     return _firestore
         .collection(_collectionName)
-        .where('itemType', isEqualTo: itemType)
+        .where('ItemType', isEqualTo: itemType)
         .snapshots()
         .map((QuerySnapshot querySnapshot) {
       return querySnapshot.docs
@@ -126,7 +126,7 @@ class FirebaseService {
       await _firestore
           .collection(_collectionName)
           .doc(itemId)
-          .update({'itemStock': newStock});
+          .update({'ItemStock': newStock});
     } catch (e) {
       throw Exception('Failed to update item stock: $e');
     }
@@ -136,7 +136,7 @@ class FirebaseService {
   Stream<List<Item>> getLowStockItemsStream(double threshold) {
     return _firestore
         .collection(_collectionName)
-        .where('itemStock', isLessThan: threshold)
+        .where('ItemStock', isLessThan: threshold)
         .snapshots()
         .map((QuerySnapshot querySnapshot) {
       return querySnapshot.docs
