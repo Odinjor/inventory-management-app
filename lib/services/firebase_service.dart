@@ -144,4 +144,34 @@ class FirebaseService {
           .toList();
     });
   }
+
+  /// Search items by name or type - client-side filtering
+  Stream<List<Item>> searchItemsStream(String query) {
+    return getItemsStream().map((items) {
+      if (query.isEmpty) {
+        return items;
+      }
+      final lowerQuery = query.toLowerCase();
+      return items
+          .where((item) =>
+              item.itemName.toLowerCase().contains(lowerQuery) ||
+              item.itemType.toLowerCase().contains(lowerQuery) ||
+              item.itemNumber.toString().contains(lowerQuery))
+          .toList();
+    });
+  }
+
+  /// Get sorted items by stock level (ascending)
+  Stream<List<Item>> getItemsSortedByStock() {
+    return getItemsStream().map((items) {
+      final sorted = List<Item>.from(items);
+      sorted.sort((a, b) => a.itemStock.compareTo(b.itemStock));
+      return sorted;
+    });
+  }
+
+  /// Check if item is low stock (below 10 units)
+  bool isLowStock(Item item) {
+    return item.itemStock < 10;
+  }
 }

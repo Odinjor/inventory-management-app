@@ -37,8 +37,12 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _itemNameController = TextEditingController();
   final TextEditingController _itemStockController = TextEditingController();
   final TextEditingController _itemTypeController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   final FirebaseService _firebaseService = FirebaseService();
+
+  bool _showLowStockOnly = false;
+  static const double LOW_STOCK_THRESHOLD = 10.0;
 
   @override
   void dispose() {
@@ -46,6 +50,7 @@ class _HomePageState extends State<HomePage> {
     _itemNameController.dispose();
     _itemStockController.dispose();
     _itemTypeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -179,55 +184,172 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Inventory Management')),
-      body: StreamBuilder<List<Item>>(
-        stream: _firebaseService.getItemsStream(),
-        builder: (context, AsyncSnapshot<List<Item>> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No items found'));
-          }
-
-          final items = snapshot.data!;
-
-          return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return Card(
-                margin: const EdgeInsets.all(10),
-                child: ListTile(
-                  title: Text(item.itemName),
-                  subtitle: Text(
-                    'ID: ${item.itemNumber} | Stock: ${item.itemStock} | Type: ${item.itemType}',
-                  ),
-                  trailing: SizedBox(
-                    width: 100,
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _createOrUpdate(item),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _deleteItem(item.id!),
-                        ),
-                      ],
+      appBar: AppBar(
+        title: const Text('Inventory Management'),
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Search and Filter Bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name, type, or ID#...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
+                  onChanged: (value) {
+                    setState(() {});
+                  },
                 ),
-              );
-            },
-          );
-        },
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _showLowStockOnly = !_showLowStockOnly;
+                          });
+                        },
+                        icon: Icon(_showLowStockOnly
+                            ? Icons.warning
+                            : Icons.warning_outlined),
+                        label: Text(_showLowStockOnly
+                            ? 'Low Stock'
+                            : 'Show All'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _showLowStockOnly
+                              ? Colors.orange
+                              : Colors.grey[300],
+                          foregroundColor: _showLowStockOnly
+                              ? Colors.white
+                              : Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Items List
+          Expanded(
+            child: StreamBuilder<List<Item>>(
+              stream: _firebaseService.getItemsStream(),
+              builder: (context, AsyncSnapshot<List<Item>> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No items found'));
+                }
+
+                // Apply filters
+                var items = snapshot.data!;
+
+                // Apply search filter
+                if (_searchController.text.isNotEmpty) {
+                  final query = _searchController.text.toLowerCase();
+                  items = items
+                      .where((item) =>
+                          item.itemName.toLowerCase().contains(query) ||
+                          item.itemType.toLowerCase().contains(query) ||
+                          item.itemNumber.toString().contains(query))
+                      .toList();
+                }
+
+                // Apply low stock filter
+                if (_showLowStockOnly) {
+                  items = items
+                      .where((item) =>
+                          _firebaseService.isLowStock(item))
+                      .toList();
+                }
+
+                if (items.isEmpty) {
+                  return Center(
+                    child: Text(_showLowStockOnly
+                        ? 'No low stock items'
+                        : 'No items found for your search'),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final isLow = _firebaseService.isLowStock(item);
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      color: isLow ? Colors.orange[50] : null,
+                      child: ListTile(
+                        leading: isLow
+                            ? Tooltip(
+                                message: 'Low Stock Alert',
+                                child: Icon(Icons.warning_amber_rounded,
+                                    color: Colors.orange[700]),
+                              )
+                            : null,
+                        title: Text(
+                          item.itemName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isLow ? Colors.orange[900] : null,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'ID: ${item.itemNumber.toInt()} | Stock: ${item.itemStock.toInt()} | Type: ${item.itemType}',
+                          style: TextStyle(
+                            color: isLow ? Colors.orange[700] : null,
+                          ),
+                        ),
+                        trailing: SizedBox(
+                          width: 100,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => _createOrUpdate(item),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () => _deleteItem(item.id!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _createOrUpdate(),
